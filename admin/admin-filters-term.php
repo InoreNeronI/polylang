@@ -64,6 +64,15 @@ class PLL_Admin_Filters_Term {
 	protected $default_term;
 
 	/**
+	 * A reference to the PLL_Admin_Default_Term instance.
+	 *
+	 * @since 2.8
+	 *
+	 * @var PLL_Admin_Default_Term
+	 */
+	protected $default_term;
+
+	/**
 	 * Constructor: setups filters and actions
 	 *
 	 * @param object $polylang
