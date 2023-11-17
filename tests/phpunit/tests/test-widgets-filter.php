@@ -12,20 +12,29 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		self::create_language( 'fr_FR' );
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		$this->links_model = self::$model->get_links_model();
 
 		require_once POLYLANG_DIR . '/include/api.php'; // Usually loaded only if an instance of Polylang exists
+
+		update_option(
+			'widget_search',
+			array(
+				2              => array( 'title' => '' ),
+				'_multiwidget' => 1,
+			)
+		);
 	}
 
 	/**
 	 * Copied from WP widgets tests
 	 */
-	function clean_up_global_scope() {
-		global $wp_widget_factory, $wp_registered_sidebars, $wp_registered_widgets, $wp_registered_widget_controls, $wp_registered_widget_updates;
+	public function clean_up_global_scope() {
+		global $_wp_sidebars_widgets, $wp_widget_factory, $wp_registered_sidebars, $wp_registered_widgets, $wp_registered_widget_controls, $wp_registered_widget_updates;
 
+		$_wp_sidebars_widgets = array();
 		$wp_registered_sidebars = array();
 		$wp_registered_widgets = array();
 		$wp_registered_widget_controls = array();
@@ -35,7 +44,7 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		parent::clean_up_global_scope();
 	}
 
-	function test_form() {
+	public function test_form() {
 		global $wp_registered_widgets;
 
 		set_current_screen( 'widgets' );
@@ -47,10 +56,11 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 
 		ob_start();
 		$wp_widget_search->form_callback( 2 );
-		$this->assertNotFalse( strpos( ob_get_clean(), 'search-2_lang_choice' ) );
+		$form = ob_get_clean();
+		$this->assertNotFalse( strpos( $form, 'widget-search-2-pll_lang' ) );
 	}
 
-	function update_lang_choice( $widget, $lang ) {
+	protected function update_lang_choice( $widget, $lang ) {
 		$pll_admin = new PLL_Admin( $this->links_model );
 		new PLL_Admin_Filters_Widgets_Options( $pll_admin );
 
@@ -62,11 +72,11 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 			'multi_number'  => '',
 		);
 
-		$_POST[ $widget->id . '_lang_choice' ] = $lang;
+		$_POST[ 'widget-' . $widget->id_base ][2]['pll_lang'] = $lang;
 		$widget->update_callback();
 	}
 
-	function test_display_with_filter() {
+	public function test_display_with_filter() {
 		global $wp_registered_widgets;
 
 		wp_widgets_init();
@@ -88,7 +98,7 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		$this->assertEmpty( ob_get_clean() );
 	}
 
-	function test_display_with_no_filter() {
+	public function test_display_with_no_filter() {
 		global $wp_registered_widgets;
 
 		wp_widgets_init();
@@ -111,7 +121,7 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 	}
 
 
-	function test_widget_media_image() {
+	public function test_widget_media_image() {
 		self::$model->options['media_support'] = 1;
 		$pll_admin = new PLL_Admin( $this->links_model );
 
@@ -119,9 +129,9 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		$pll_admin->posts = new PLL_CRUD_Posts( $pll_admin );
 
 		$pll_admin->pref_lang = self::$model->get_language( 'en' );
-		$filename = dirname( __FILE__ ) . '/../data/image.jpg';
+		$filename = __DIR__ . '/../data/image.jpg';
 
-		$en = $this->factory->attachment->create_upload_object( $filename );
+		$en = self::factory()->attachment->create_upload_object( $filename );
 		wp_update_post(
 			array(
 				'ID'           => $en,
@@ -157,10 +167,10 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		$widget->widget( $args, $instance );
 		$output = ob_get_clean();
 
-		$this->assertContains( "wp-image-{$fr}", $output ); // CSS class
-		$this->assertContains( 'Alt text FR', $output );
-		$this->assertContains( 'Caption FR', $output );
-		$this->assertNotContains( 'Test image FR', $output );
+		$this->assertStringContainsString( "wp-image-{$fr}", $output ); // CSS class
+		$this->assertStringContainsString( 'Alt text FR', $output );
+		$this->assertStringContainsString( 'Caption FR', $output );
+		$this->assertStringNotContainsString( 'Test image FR', $output );
 
 		// Edit Image fields are filled
 		$instance = array( 'attachment_id' => $en, 'alt' => 'Custom alt', 'caption' => 'Custom caption', 'image_title' => 'Custom title' );
@@ -168,26 +178,34 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		$widget->widget( $args, $instance );
 		$output = ob_get_clean();
 
-		$this->assertContains( 'Alt text FR', $output );
-		$this->assertContains( 'Caption FR', $output );
-		$this->assertContains( 'Test image FR', $output );
+		$this->assertStringContainsString( 'Alt text FR', $output );
+		$this->assertStringContainsString( 'Caption FR', $output );
+		$this->assertStringContainsString( 'Test image FR', $output );
 
 		unset( $GLOBALS['polylang'] );
 	}
 
-	function test_wp_get_sidebars_widgets() {
+	public function test_wp_get_sidebars_widgets() {
 		global $wp_registered_widgets;
+
+		update_option(
+			'sidebars_widgets',
+			array(
+				'wp_inactive_widgets' => array(),
+				'sidebar-1'           => array( 'search-2' ),
+			)
+		);
 
 		wp_widgets_init();
 		$wp_widget_search = $wp_registered_widgets['search-2']['callback'][0];
 		$this->update_lang_choice( $wp_widget_search, 'en' );
 
 		$frontend = new PLL_Frontend( $this->links_model );
-		$frontend->filters = new PLL_Frontend_Filters( $frontend );
+		$frontend->filters_widgets = new PLL_Frontend_Filters_Widgets( $frontend );
 		$frontend->curlang = self::$model->get_language( 'en' );
 
-		$frontend->filters->cache = $this->getMockBuilder( 'PLL_Cache' )->getMock();
-		$frontend->filters->cache->method( 'get' )->willReturn( false );
+		$frontend->filters_widgets->cache = $this->getMockBuilder( 'PLL_Cache' )->getMock();
+		$frontend->filters_widgets->cache->method( 'get' )->willReturn( false );
 
 		$sidebars = wp_get_sidebars_widgets();
 		$this->assertTrue( in_array( 'search-2', $sidebars['sidebar-1'] ) );
@@ -197,9 +215,9 @@ class Widgets_Filter_Test extends PLL_UnitTestCase {
 		$this->assertFalse( in_array( 'search-2', $sidebars['sidebar-1'] ) );
 	}
 
-	function test_widgets_language_filter_is_not_displayed_for_page_builders() {
+	public function test_widgets_language_filter_is_not_displayed_for_page_builders() {
 		set_current_screen( 'post' );
-		$options = PLL_Install::get_default_options();
+		$options = array_merge( PLL_Install::get_default_options(), array( 'default_lang' => 'en' ) );
 		$model = new PLL_Admin_Model( $options );
 		$links_model = new PLL_Links_Default( $model );
 		$polylang = new PLL_Admin( $links_model );

@@ -1,7 +1,10 @@
 <?php
 
 class Choose_Lang_Domain_Test extends PLL_UnitTestCase {
+
 	public $structure = '/%postname%/';
+	protected $hosts;
+	protected $server;
 
 	/**
 	 * @param WP_UnitTest_Factory $factory
@@ -15,10 +18,12 @@ class Choose_Lang_Domain_Test extends PLL_UnitTestCase {
 		require_once POLYLANG_DIR . '/include/api.php';
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		global $wp_rewrite;
+
+		remove_all_actions( 'wp_default_styles' ); // So `PLL_Choose_Lang::set_language()` doesn't calls `wp_styles()`, same behavior as production environment.
 
 		$this->server = $_SERVER; // save this
 
@@ -48,14 +53,18 @@ class Choose_Lang_Domain_Test extends PLL_UnitTestCase {
 		$this->frontend = new PLL_Frontend( $links_model );
 	}
 
-	function tearDown() {
-		parent::tearDown();
+	public function tear_down() {
+		parent::tear_down();
 
 		$_SERVER = $this->server;
 	}
 
-	// overrides WP_UnitTestCase::go_to
-	function go_to( $url ) {
+	/**
+	 * Overrides WP_UnitTestCase::go_to().
+	 *
+	 * @param string $url The URL for the request.
+	 */
+	public function go_to( $url ) {
 		// copy paste of WP_UnitTestCase::go_to
 		$_GET = $_POST = array();
 		foreach ( array( 'query_string', 'id', 'postdata', 'authordata', 'day', 'currentmonth', 'page', 'pages', 'multipage', 'more', 'numpages', 'pagenow' ) as $v ) {
@@ -99,11 +108,11 @@ class Choose_Lang_Domain_Test extends PLL_UnitTestCase {
 		$GLOBALS['wp']->main( $parts['query'] );
 	}
 
-	function test_home_latest_posts() {
-		$en = $this->factory->post->create();
+	public function test_home_latest_posts() {
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
 		$this->go_to( $this->hosts['fr'] );
@@ -119,11 +128,11 @@ class Choose_Lang_Domain_Test extends PLL_UnitTestCase {
 		$this->assertEquals( trailingslashit( $this->hosts['fr'] ), $this->frontend->links->get_translation_url( self::$model->get_language( 'fr' ) ) );
 	}
 
-	function test_single_post() {
-		$en = $this->factory->post->create( array( 'post_title' => 'test' ) );
+	public function test_single_post() {
+		$en = self::factory()->post->create( array( 'post_title' => 'test' ) );
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create( array( 'post_title' => 'essai' ) );
+		$fr = self::factory()->post->create( array( 'post_title' => 'essai' ) );
 		self::$model->post->set_language( $fr, 'fr' );
 
 		$this->go_to( $this->hosts['fr'] . '/essai/' );

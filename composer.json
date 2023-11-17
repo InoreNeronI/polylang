@@ -5,17 +5,19 @@
 	"homepage": "https://polylang.pro",
 	"type": "wordpress-plugin",
 	"require": {
-		"php": ">=5.6"
+		"php": ">=7.0"
 	},
 	"require-dev": {
-		"wpsyntex/wp-phpunit": "dev-branch-5.7",
+		"wpsyntex/polylang-phpstan": "^1.0",
 		"dealerdirect/phpcodesniffer-composer-installer": "*",
 		"wp-coding-standards/wpcs": "*",
 		"automattic/vipwpcs": "*",
 		"phpcompatibility/phpcompatibility-wp": "*",
-		"szepeviktor/phpstan-wordpress": "*",
-		"behat/behat": "3.7.*"
+		"behat/behat": "^3.7|^3.8",
+		"yoast/wp-test-utils": "^1.0.0"
 	},
+	"minimum-stability": "dev",
+	"prefer-stable": true,
 	"autoload": {
 		"classmap": [
 			"admin/",
@@ -26,5 +28,34 @@
 			"modules/",
 			"settings/"
 		]
+	},
+	"autoload-dev": {
+		"classmap": [
+			"tests/phpunit/"
+		]
+	},
+	"scripts": {
+		"test":"vendor/bin/phpunit",
+		"cs":"vendor/bin/phpcs",
+		"stan": "vendor/bin/phpstan analyze --memory-limit=1500M",
+		"lint": [
+			"@cs",
+			"@stan"
+		],
+		"build": "bin/build.sh",
+		"dist": "bin/distribute.sh"
+	},
+	"scripts-descriptions": {
+		"test":"Runs PHPUnit tests.",
+		"cs":"Runs PHPCS linter.",
+		"stan": "Runs PHPStan analysis.",
+		"lint": "Runs both PHPCS and PHPStan.",
+		"build": "Builds the project.",
+		"dist": "Make the zip file to distibute the project release."
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
 	}
 }

@@ -15,9 +15,8 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 		self::$editor = $factory->user->create( array( 'role' => 'editor' ) );
 	}
 
-	public function setUp() {
-		parent::setUp();
-		remove_all_actions( 'admin_init' ); // To save (a lot of) time as WP will attempt to update core and plugins.
+	public function set_up() {
+		parent::set_up();
 
 		wp_set_current_user( self::$editor ); // Set a user to pass current_user_can tests.
 
@@ -31,14 +30,14 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 
 	public function test_term_lang_choice_in_edit_category() {
 		// Possible parents.
-		$en = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'test cat' ) );
+		$en = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'test cat' ) );
 		self::$model->term->set_language( $en, 'en' );
 
-		$fr = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'essai cat' ) );
+		$fr = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'essai cat' ) );
 		self::$model->term->set_language( $fr, 'fr' );
 
 		// The category.
-		$term_id = $this->factory->term->create( array( 'taxonomy' => 'category' ) );
+		$term_id = self::factory()->term->create( array( 'taxonomy' => 'category' ) );
 
 		$_POST = array(
 			'action'     => 'term_lang_choice',
@@ -79,18 +78,15 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 
 	public function test_term_lang_choice_in_new_tag() {
 		// Possible parents.
-		$en = $this->factory->term->create( array( 'taxonomy' => 'post_tag', 'name' => 'test' ) );
+		$en = self::factory()->term->create( array( 'taxonomy' => 'post_tag', 'name' => 'test' ) );
 		self::$model->term->set_language( $en, 'en' );
 
-		$fr = $this->factory->term->create( array( 'taxonomy' => 'post_tag', 'name' => 'essai' ) );
+		$fr = self::factory()->term->create( array( 'taxonomy' => 'post_tag', 'name' => 'essai' ) );
 		self::$model->term->set_language( $fr, 'fr' );
 
 		// We need posts for the tag cloud.
-		$this->factory->post->create( array( 'tags_input' => 'test' ) );
-		$this->factory->post->create( array( 'tags_input' => 'essai' ) );
-
-		// The post_tag.
-		$term_id = $this->factory->term->create( array( 'taxonomy' => 'post_tag' ) );
+		self::factory()->post->create( array( 'tags_input' => 'test' ) );
+		self::factory()->post->create( array( 'tags_input' => 'essai' ) );
 
 		$_POST = array(
 			'action'     => 'term_lang_choice',
@@ -130,18 +126,18 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 	}
 
 	public function test_terms_not_translated() {
-		$en = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'test cat' ) );
+		$en = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'test cat' ) );
 		self::$model->term->set_language( $en, 'en' );
 
-		$fr = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'essai cat' ) );
+		$fr = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'essai cat' ) );
 		self::$model->term->set_language( $fr, 'fr' );
 
 		self::$model->term->save_translations( $en, compact( 'en', 'fr' ) );
 
-		$searched = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'test searched' ) );
+		$searched = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'test searched' ) );
 		self::$model->term->set_language( $searched, 'en' );
 
-		$fr = $this->factory->term->create( array( 'taxonomy' => 'category' ) );
+		$fr = self::factory()->term->create( array( 'taxonomy' => 'category' ) );
 		self::$model->term->set_language( $fr, 'fr' );
 
 		$_GET = array(
@@ -168,7 +164,7 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 		$this->assertEquals( $searched, $response[0]['id'] );
 
 		// Translate the current term.
-		$en = $this->factory->term->create( array( 'taxonomy' => 'category' ) );
+		$en = self::factory()->term->create( array( 'taxonomy' => 'category' ) );
 		self::$model->term->set_language( $en, 'en' );
 
 		self::$model->term->save_translations( $en, compact( 'en', 'fr' ) );
@@ -186,10 +182,10 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 	}
 
 	public function test_format_not_translated_term() {
-		$parent = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'Parent' ) );
+		$parent = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Parent' ) );
 		self::$model->term->set_language( $parent, 'en' );
 
-		$child = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'Child', 'parent' => $parent ) );
+		$child = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Child', 'parent' => $parent ) );
 		self::$model->term->set_language( $child, 'en' );
 
 		$this->pll_admin->set_current_language();
@@ -228,5 +224,109 @@ class Ajax_Filters_Term_Test extends PLL_Ajax_UnitTestCase {
 
 		$this->assertCount( 1, $response );
 		$this->assertEquals( 'Parent', $response[0]['value'] );
+	}
+
+	public function test_inline_save_tax_with_same_slugs() {
+		// Load WP ajax response action.
+		require_once ABSPATH . 'wp-admin/includes/ajax-actions.php';
+		add_action( 'wp_ajax_inline-save-tax', 'wp_ajax_inline_save_tax', 1 );
+
+		wp_set_current_user( self::$editor ); // Set a user to pass check_ajax_referer test.
+
+		$en = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Test' ) );
+		self::$model->term->set_language( $en, 'en' );
+
+		// Create a category translation with the same name (i.e. the same slug).
+		$_REQUEST = $_POST = array(
+			'action'           => 'add-tag',
+			'term_lang_choice' => 'fr',
+			'_pll_nonce'       => wp_create_nonce( 'pll_language' ),
+		);
+		$fr = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Test' ) );
+		self::$model->term->set_language( $fr, 'fr' );
+
+		$term = get_term( $fr );
+		$this->assertInstanceOf( WP_Term::class, $term, 'Expected the category to be an instance of WP_Term.' );
+		$this->assertSame( 'Test', $term->name, 'Expected the title of the category in secondary language to match the one sent via POST.' );
+		$this->assertSame( 'test-fr', $term->slug, 'Expected the slug of the category in secondary language to be suffixed.' );
+		$this->assertSame( 'fr', self::$model->term->get_language( $fr )->slug, 'The langue is not set correctly for the category.' );
+
+
+		$_REQUEST = $_POST = array(
+			'name'               => 'More test',
+			'slug'               => 'test-fr',
+			'inline_lang_choice' => 'fr',
+			'_inline_edit'       => wp_create_nonce( 'taxinlineeditnonce', '_inline_edit' ),
+			'taxonomy'           => 'category',
+			'post_type'          => 'post',
+			'action'             => 'inline-save-tax',
+			'tax_type'           => 'tag',
+			'tax_ID'             => $fr,
+			'pll_ajax_backend'   => '1',
+			'description'        => '',
+		);
+
+		try {
+			$this->_handleAjax( 'inline-save-tax' );
+		} catch ( WPAjaxDieContinueException $e ) {
+			unset( $e );
+		}
+
+		$term = get_term( $fr );
+		$this->assertInstanceOf( WP_Term::class, $term, 'Expected the category to be an instance of WP_Term.' );
+		$this->assertSame( 'More test', $term->name, 'Expected the title of the category in secondary language to match the one sent via POST.' );
+		$this->assertSame( 'test-fr', $term->slug, 'Expected the slug of the category in secondary language to be suffixed.' );
+	}
+
+	public function test_inline_save_tax_with_new_slugs() {
+		// Load WP ajax response action.
+		require_once ABSPATH . 'wp-admin/includes/ajax-actions.php';
+		add_action( 'wp_ajax_inline-save-tax', 'wp_ajax_inline_save_tax', 1 );
+
+		wp_set_current_user( self::$editor ); // Set a user to pass check_ajax_referer test.
+
+		$en = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Test' ) );
+		self::$model->term->set_language( $en, 'en' );
+
+		// Create a category translation with the same name (i.e. the same slug).
+		$_REQUEST = $_POST = array(
+			'action'           => 'add-tag',
+			'term_lang_choice' => 'fr',
+			'_pll_nonce'       => wp_create_nonce( 'pll_language' ),
+		);
+		$fr = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Test' ) );
+		self::$model->term->set_language( $fr, 'fr' );
+
+		$term = get_term( $fr );
+		$this->assertInstanceOf( WP_Term::class, $term, 'Expected the category to be an instance of WP_Term.' );
+		$this->assertSame( 'Test', $term->name, 'Expected the title of the category in secondary language to match the one sent via POST.' );
+		$this->assertSame( 'test-fr', $term->slug, 'Expected the slug of the category in secondary language to be suffixed.' );
+		$this->assertSame( 'fr', self::$model->term->get_language( $fr )->slug, 'The langue is not set correctly for the category.' );
+
+
+		$_REQUEST = $_POST = array(
+			'name'               => 'Test',
+			'slug'               => 'test-new-fr',
+			'inline_lang_choice' => 'fr',
+			'_inline_edit'       => wp_create_nonce( 'taxinlineeditnonce', '_inline_edit' ),
+			'taxonomy'           => 'category',
+			'post_type'          => 'post',
+			'action'             => 'inline-save-tax',
+			'tax_type'           => 'tag',
+			'tax_ID'             => $fr,
+			'pll_ajax_backend'   => '1',
+			'description'        => '',
+		);
+
+		try {
+			$this->_handleAjax( 'inline-save-tax' );
+		} catch ( WPAjaxDieContinueException $e ) {
+			unset( $e );
+		}
+
+		$term = get_term( $fr );
+		$this->assertInstanceOf( WP_Term::class, $term, 'Expected the category to be an instance of WP_Term.' );
+		$this->assertSame( 'Test', $term->name, 'Expected the title of the category in secondary language to remain the same.' );
+		$this->assertSame( 'test-new-fr', $term->slug, 'Expected the slug of the category in secondary language to be updated.' );
 	}
 }

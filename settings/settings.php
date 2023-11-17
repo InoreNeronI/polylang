@@ -18,14 +18,14 @@ class PLL_Settings extends PLL_Admin_Base {
 	/**
 	 * Name of the active module.
 	 *
-	 * @var string
+	 * @var string|null
 	 */
 	protected $active_tab;
 
 	/**
 	 * Array of modules classes.
 	 *
-	 * @var PLL_Settings_Module[]
+	 * @var PLL_Settings_Module[]|null
 	 */
 	protected $modules;
 
@@ -47,12 +47,13 @@ class PLL_Settings extends PLL_Admin_Base {
 
 		add_action( 'admin_init', array( $this, 'register_settings_modules' ) );
 
-		// Adds screen options and the about box in the languages admin panel
+		// Adds screen options and the about box in the languages admin panel.
 		add_action( 'load-toplevel_page_mlang', array( $this, 'load_page' ) );
 		add_action( 'load-languages_page_mlang_strings', array( $this, 'load_page_strings' ) );
 
-		// Saves per-page value in screen option
-		add_filter( 'set-screen-option', array( $this, 'set_screen_option' ), 10, 3 );
+		// Saves the per-page value in screen options.
+		add_filter( 'set_screen_option_pll_lang_per_page', array( $this, 'set_screen_option' ), 10, 3 );
+		add_filter( 'set_screen_option_pll_strings_per_page', array( $this, 'set_screen_option' ), 10, 3 );
 	}
 
 	/**
@@ -65,7 +66,7 @@ class PLL_Settings extends PLL_Admin_Base {
 	public function register_settings_modules() {
 		$modules = array();
 
-		if ( $this->model->get_languages_list() ) {
+		if ( $this->model->has_languages() ) {
 			$modules = array(
 				'PLL_Settings_Url',
 				'PLL_Settings_Browser',
@@ -151,26 +152,25 @@ class PLL_Settings extends PLL_Admin_Base {
 	}
 
 	/**
-	 * Save the "Views/Uploads per page" option set by this user
+	 * Saves the number of rows in the languages or strings table set by this user.
 	 *
 	 * @since 0.9.5
 	 *
-	 * @param mixed  $status false or value returned by previous filter
-	 * @param string $option Name of the option being changed
-	 * @param string $value  Value of the option
-	 *
-	 * @return string New value if this is our option, otherwise nothing
+	 * @param mixed  $screen_option False or value returned by a previous filter, not used.
+	 * @param string $option        The name of the option, not used.
+	 * @param int    $value         The new value of the option to save.
+	 * @return int The new value of the option.
 	 */
-	public function set_screen_option( $status, $option, $value ) {
-		return 'pll_lang_per_page' === $option || 'pll_strings_per_page' === $option ? $value : $status;
+	public function set_screen_option( $screen_option, $option, $value ) {
+		return (int) $value;
 	}
 
 	/**
-	 * Manages the user input for the languages pages
+	 * Manages the user input for the languages pages.
 	 *
 	 * @since 1.9
 	 *
-	 * @param string $action
+	 * @param string $action The action name.
 	 * @return void
 	 */
 	public function handle_actions( $action ) {
@@ -185,7 +185,7 @@ class PLL_Settings extends PLL_Admin_Base {
 					}
 				} else {
 					add_settings_error( 'general', 'pll_languages_created', __( 'Language added.', 'polylang' ), 'updated' );
-					$locale = sanitize_text_field( wp_unslash( $_POST['locale'] ) ); // phpcs:ignore WordPress.Security
+					$locale = sanitize_locale_name( $_POST['locale'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
 
 					if ( 'en_US' !== $locale && current_user_can( 'install_languages' ) ) {
 						// Attempts to install the language pack
@@ -240,14 +240,7 @@ class PLL_Settings extends PLL_Admin_Base {
 			case 'content-default-lang':
 				check_admin_referer( 'content-default-lang' );
 
-				if ( $nolang = $this->model->get_objects_with_no_lang() ) {
-					if ( ! empty( $nolang['posts'] ) ) {
-						$this->model->set_language_in_mass( 'post', $nolang['posts'], $this->options['default_lang'] );
-					}
-					if ( ! empty( $nolang['terms'] ) ) {
-						$this->model->set_language_in_mass( 'term', $nolang['terms'], $this->options['default_lang'] );
-					}
-				}
+				$this->model->set_language_in_mass();
 
 				self::redirect(); // To refresh the page ( possible thanks to the $_GET['noheader']=true )
 				break;
@@ -330,10 +323,10 @@ class PLL_Settings extends PLL_Admin_Base {
 
 		$suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
 
-		wp_enqueue_script( 'pll_admin', plugins_url( '/js/build/admin' . $suffix . '.js', POLYLANG_BASENAME ), array( 'jquery', 'wp-ajax-response', 'postbox', 'jquery-ui-selectmenu' ), POLYLANG_VERSION, true );
+		wp_enqueue_script( 'pll_admin', plugins_url( '/js/build/admin' . $suffix . '.js', POLYLANG_ROOT_FILE ), array( 'jquery', 'wp-ajax-response', 'postbox', 'jquery-ui-selectmenu' ), POLYLANG_VERSION, true );
 		wp_localize_script( 'pll_admin', 'pll_admin', array( 'dismiss_notice' => esc_html__( 'Dismiss this notice.', 'polylang' ) ) );
 
-		wp_enqueue_style( 'pll_selectmenu', plugins_url( '/css/build/selectmenu' . $suffix . '.css', POLYLANG_BASENAME ), array(), POLYLANG_VERSION );
+		wp_enqueue_style( 'pll_selectmenu', plugins_url( '/css/build/selectmenu' . $suffix . '.css', POLYLANG_ROOT_FILE ), array(), POLYLANG_VERSION );
 	}
 
 	/**
@@ -364,7 +357,8 @@ class PLL_Settings extends PLL_Admin_Base {
 	 * @return void
 	 */
 	public static function redirect( $args = array() ) {
-		if ( $errors = get_settings_errors() ) {
+		$errors = get_settings_errors();
+		if ( ! empty( $errors ) ) {
 			set_transient( 'settings_errors', $errors, 30 );
 			$args['settings-updated'] = 1;
 		}

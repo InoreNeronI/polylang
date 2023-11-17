@@ -17,8 +17,8 @@ class Hreflang_Test extends PLL_UnitTestCase {
 		self::$model->options['hide_default'] = 0;
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		$links_model = self::$model->get_links_model();
 		$this->frontend = new PLL_Frontend( $links_model );
@@ -36,14 +36,14 @@ class Hreflang_Test extends PLL_UnitTestCase {
 		$GLOBALS['polylang'] = &$this->frontend;
 	}
 
-	function test_hreflang() {
-		$uk = $this->factory->post->create();
+	public function test_hreflang() {
+		$uk = self::factory()->post->create();
 		self::$model->post->set_language( $uk, 'uk' );
 
-		$us = $this->factory->post->create();
+		$us = self::factory()->post->create();
 		self::$model->post->set_language( $us, 'us' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
 		self::$model->post->save_translations( $fr, compact( 'uk', 'us', 'fr' ) );
@@ -73,11 +73,11 @@ class Hreflang_Test extends PLL_UnitTestCase {
 		$this->assertNotFalse( strpos( $out, 'x-default' ) );
 	}
 
-	function test_paginated_post() {
-		$uk = $this->factory->post->create( array( 'post_content' => 'en1<!--nextpage-->en2' ) );
+	public function test_paginated_post() {
+		$uk = self::factory()->post->create( array( 'post_content' => 'en1<!--nextpage-->en2' ) );
 		self::$model->post->set_language( $uk, 'uk' );
 
-		$us = $this->factory->post->create( array( 'post_content' => 'en1<!--nextpage-->en2' ) );
+		$us = self::factory()->post->create( array( 'post_content' => 'en1<!--nextpage-->en2' ) );
 		self::$model->post->set_language( $us, 'us' );
 
 		self::$model->post->save_translations( $uk, compact( 'uk', 'us' ) );
@@ -101,11 +101,11 @@ class Hreflang_Test extends PLL_UnitTestCase {
 		$this->assertEmpty( $out );
 	}
 
-	function test_paged_archive() {
+	public function test_paged_archive() {
 		update_option( 'posts_per_page', 2 ); // to avoid creating too much posts
 
-		$posts_us = $this->factory->post->create_many( 3 );
-		$posts_uk = $this->factory->post->create_many( 3 );
+		$posts_us = self::factory()->post->create_many( 3 );
+		$posts_uk = self::factory()->post->create_many( 3 );
 
 		for ( $i = 0; $i < 3; $i++ ) {
 			self::$model->post->set_language( $us = $posts_us[ $i ], 'us' );

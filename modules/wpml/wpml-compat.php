@@ -14,7 +14,7 @@ class PLL_WPML_Compat {
 	/**
 	 * Singleton instance
 	 *
-	 * @var PLL_WPML_Compat
+	 * @var PLL_WPML_Compat|null
 	 */
 	protected static $instance;
 
@@ -23,7 +23,7 @@ class PLL_WPML_Compat {
 	 *
 	 * @var array
 	 */
-	protected static $strings;
+	protected static $strings = array();
 
 	/**
 	 * @var PLL_WPML_API
@@ -41,6 +41,10 @@ class PLL_WPML_Compat {
 		$this->api = new PLL_WPML_API();
 
 		self::$strings = get_option( 'polylang_wpml_strings', array() );
+
+		if ( ! is_array( self::$strings ) ) {
+			self::$strings = array(); // In case the serialized option is corrupted.
+		}
 
 		add_action( 'pll_language_defined', array( $this, 'define_constants' ) );
 		add_action( 'pll_no_language_defined', array( $this, 'define_constants' ) );
@@ -103,6 +107,10 @@ class PLL_WPML_Compat {
 	 * @return void
 	 */
 	public function register_string( $context, $name, $string ) {
+		if ( ! $string || ! is_scalar( $string ) ) {
+			return;
+		}
+
 		// If a string has already been registered with the same name and context, let's replace it.
 		$exist_string = $this->get_string_by_context_and_name( $context, $name );
 		if ( $exist_string && $exist_string !== $string ) {
@@ -110,19 +118,20 @@ class PLL_WPML_Compat {
 
 			// Assign translations of the old string to the new string, except for the default language.
 			foreach ( $languages as $language ) {
-				if ( pll_default_language() !== $language->slug ) {
-					$mo = new PLL_MO();
-					$mo->import_from_db( $language );
-					$mo->add_entry( $mo->make_entry( $string, $mo->translate( $exist_string ) ) );
-					$mo->export_to_db( $language );
+				if ( $language->is_default ) {
+					continue;
 				}
+				$mo = new PLL_MO();
+				$mo->import_from_db( $language );
+				$mo->add_entry( $mo->make_entry( $string, $mo->translate( $exist_string ) ) );
+				$mo->export_to_db( $language );
 			}
 			$this->unregister_string( $context, $name );
 		}
 
 		// Registers the string if it does not exist yet (multiline as in WPML).
 		$to_register = array( 'context' => $context, 'name' => $name, 'string' => $string, 'multiline' => true, 'icl' => true );
-		if ( ! in_array( $to_register, self::$strings ) && $to_register['string'] ) {
+		if ( ! in_array( $to_register, self::$strings ) ) {
 			$key = md5( "$context | $name" );
 			self::$strings[ $key ] = $to_register;
 			update_option( 'polylang_wpml_strings', self::$strings );

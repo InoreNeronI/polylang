@@ -12,25 +12,25 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		self::create_language( 'fr_FR' );
 
 		@mkdir( WP_CONTENT_DIR . '/polylang' );
-		copy( dirname( __FILE__ ) . '/../data/wpml-config.xml', WP_CONTENT_DIR . '/polylang/wpml-config.xml' );
+		copy( __DIR__ . '/../data/wpml-config.xml', WP_CONTENT_DIR . '/polylang/wpml-config.xml' );
 
 		require_once POLYLANG_DIR . '/include/api.php';
 	}
 
-	static function wpTearDownAfterClass() {
+	public static function wpTearDownAfterClass() {
 		parent::wpTearDownAfterClass();
 
 		unlink( WP_CONTENT_DIR . '/polylang/wpml-config.xml' );
 		rmdir( WP_CONTENT_DIR . '/polylang' );
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		$this->links_model = self::$model->get_links_model();
 	}
 
-	function prepare_options( $method = 'ARRAY' ) {
+	protected function prepare_options( $method = 'ARRAY' ) {
 		// mirror options defined in the sample wpml-config.xml
 		$my_plugins_options = array(
 			'option_name_1'   => 'val1',
@@ -68,7 +68,7 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		);
 
 		if ( 'OBJECT' === $method ) {
-			$my_plugins_options = json_decode( json_encode( $my_plugins_options ) ); // Recursively converts the arrays to objects.
+			$my_plugins_options = json_decode( wp_json_encode( $my_plugins_options ) ); // Recursively converts the arrays to objects.
 		}
 
 		update_option( 'my_plugins_options', $my_plugins_options );
@@ -77,7 +77,7 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		update_option( 'generic_option_2', 'generic_val_2' );
 	}
 
-	function translate_options( $slug ) {
+	protected function translate_options( $slug ) {
 		$language = self::$model->get_language( $slug );
 		$mo = new PLL_MO();
 		$mo->import_from_db( $language );
@@ -103,20 +103,20 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		$mo->export_to_db( $language );
 	}
 
-	function test_cf() {
+	public function test_cf() {
 		wp_set_current_user( 1 ); // To pass current_user_can_synchronize() test
 
 		$pll_admin = new PLL_Admin( $this->links_model );
 		PLL_WPML_Config::instance()->init();
 
-		$en = $from = $this->factory->post->create();
+		$en = $from = self::factory()->post->create();
 		self::$model->post->set_language( $from, 'en' );
 		add_post_meta( $from, 'quantity', 1 ); // copy
 		add_post_meta( $from, 'custom-title', 'title' ); // translate
 		add_post_meta( $from, 'bg-color', '#23282d' ); // copy-once
 		add_post_meta( $from, 'date-added', 2007 ); // ignore
 
-		$fr = $to = $this->factory->post->create();
+		$fr = $to = self::factory()->post->create();
 		self::$model->post->set_language( $to, 'fr' );
 		self::$model->post->save_translations( $en, compact( 'en', 'fr' ) );
 
@@ -152,18 +152,18 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 2007, get_post_meta( $from, 'date-added', true ) );
 	}
 
-	function test_custom_term_field() {
+	public function test_custom_term_field() {
 		$pll_admin = new PLL_Admin( $this->links_model );
 		PLL_WPML_Config::instance()->init();
 
-		$en = $from = $this->factory->term->create( array( 'taxonomy' => 'category' ) );
+		$en = $from = self::factory()->term->create( array( 'taxonomy' => 'category' ) );
 		self::$model->term->set_language( $from, 'en' );
 		add_term_meta( $from, 'term_meta_A', 'A' ); // copy
 		add_term_meta( $from, 'term_meta_B', 'B' ); // translate
 		add_term_meta( $from, 'term_meta_C', 'C' ); // ignore
 		add_term_meta( $from, 'term_meta_D', 'D' ); // copy-once
 
-		$fr = $to = $this->factory->term->create( array( 'taxonomy' => 'category' ) );
+		$fr = $to = self::factory()->term->create( array( 'taxonomy' => 'category' ) );
 		self::$model->term->set_language( $to, 'fr' );
 		self::$model->term->save_translations( $en, compact( 'en', 'fr' ) );
 
@@ -199,8 +199,39 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'D', get_term_meta( $from, 'term_meta_D', true ) );
 	}
 
-	function test_cpt() {
-		$frontend = new PLL_Frontend( $this->links_model );
+	public function test_export_custom_fiels() {
+		$wpml_config = PLL_WPML_Config::instance();
+		$wpml_config->init();
+
+		// `custom-nested-2` is not expected because it is not in the `<custom-fields>` list.
+		$expected = array(
+			'previous-value'     => 1,
+			'custom-title'       => 1,
+			'custom|nested'      => array(
+				'sub-1' => 1,
+				'sub-2' => array(
+					'sub|21' => array(
+						'sub-211' => 1,
+					),
+				),
+			),
+			'custom-description' => 1,
+		);
+		$result   = $wpml_config->post_metas_to_export( array( 'previous-value' => 1 ) );
+
+		$this->assertSame( $expected, $result );
+
+		$expected = array(
+			'previous-value' => 1,
+			'term_meta_B'    => 1,
+		);
+		$result   = $wpml_config->term_metas_to_export( array( 'previous-value' => 1 ) );
+
+		$this->assertSame( $expected, $result );
+	}
+
+	public function test_cpt() {
+		new PLL_Frontend( $this->links_model );
 		PLL_WPML_Config::instance()->init();
 
 		register_post_type( 'book' ); // translated
@@ -221,8 +252,8 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		_unregister_post_type( 'dvd' );
 	}
 
-	function test_tax() {
-		$frontend = new PLL_Frontend( $this->links_model );
+	public function test_tax() {
+		new PLL_Frontend( $this->links_model );
 		PLL_WPML_Config::instance()->init();
 
 		register_post_type( 'book' ); // translated
@@ -245,7 +276,7 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		_unregister_taxonomy( 'publisher' );
 	}
 
-	function test_translate_strings() {
+	public function test_translate_strings() {
 		$this->prepare_options( 'ARRAY' ); // Before reading the wpml-config.xml file.
 		$this->translate_options( 'fr' );
 
@@ -275,7 +306,7 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'generic_val_2_fr', get_option( 'generic_option_2' ) );
 	}
 
-	function test_translate_strings_object() {
+	public function test_translate_strings_object() {
 		$this->prepare_options( 'OBJECT' ); // Before reading the wpml-config.xml file.
 		$this->translate_options( 'fr' );
 
@@ -303,7 +334,7 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 	}
 
 
-	function _test_register_string() {
+	protected function _test_register_string() {
 		$GLOBALS['polylang'] = new PLL_Admin( $this->links_model );
 		PLL_WPML_Config::instance()->init();
 
@@ -327,13 +358,59 @@ class WPML_Config_Test extends PLL_UnitTestCase {
 		$this->assertContains( 'generic_val_2', $strings );
 	}
 
-	function test_register_string() {
+	public function test_register_string() {
 		$this->prepare_options( 'ARRAY' );
 		$this->_test_register_string();
 	}
 
-	function test_register_string_object() {
+	public function test_register_string_object() {
 		$this->prepare_options( 'OBJECT' );
 		$this->_test_register_string();
+	}
+
+	public function test_gutenberg_blocks() {
+		PLL_WPML_Config::instance()->init();
+
+		$parsing_rules                = array(
+			'my-plugin/my-block' => array(
+				'//div/p',
+			),
+		);
+		$parsing_rules_for_attributes = array(
+			'my-plugin/my-block' => array(
+				'buttonText',
+			),
+		);
+
+		$expected_parsing_rules                = array(
+			'my-plugin/my-block' => array(
+				'//figure/figcaption',
+				'//figure/img/@alt',
+			),
+			'my-plugin/my-block-2' => array(
+				'//div/p/a',
+			),
+			'my-plugin/my-block-6' => array(
+				'//div/p/a',
+			),
+		);
+		$expected_parsing_rules_for_attributes = array(
+			'my-plugin/my-block' => array(
+				'headingTitle',
+				'text',
+			),
+			'my-plugin/my-block-2' => array(
+				'iconLabel',
+			),
+			'my-plugin/my-block-5' => array(
+				'iconLabel',
+			),
+		);
+
+		$parsing_rules                = apply_filters( 'pll_blocks_xpath_rules', $parsing_rules );
+		$parsing_rules_for_attributes = apply_filters( 'pll_blocks_rules_for_attributes', $parsing_rules_for_attributes );
+
+		$this->assertSameSets( $expected_parsing_rules, $parsing_rules, 'Rules from WPML config should be added and override the existing ones for each block.' );
+		$this->assertSameSets( $expected_parsing_rules_for_attributes, $parsing_rules_for_attributes, 'Rules for blocks attributes from WPML config should be added and override the existing ones for each block.' );
 	}
 }

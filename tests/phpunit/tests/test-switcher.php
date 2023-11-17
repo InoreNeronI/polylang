@@ -1,7 +1,9 @@
 <?php
 
 class Switcher_Test extends PLL_UnitTestCase {
+
 	private $structure = '/%postname%/';
+	protected $switcher;
 
 	/**
 	 * @param WP_UnitTest_Factory $factory
@@ -18,8 +20,8 @@ class Switcher_Test extends PLL_UnitTestCase {
 		self::$model->post->register_taxonomy(); // Needed for post counting
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		$links_model = self::$model->get_links_model();
 		$this->frontend = new PLL_Frontend( $links_model );
@@ -32,14 +34,14 @@ class Switcher_Test extends PLL_UnitTestCase {
 		$this->switcher = new PLL_Switcher();
 	}
 
-	function test_the_languages_raw() {
-		$en = $this->factory->post->create();
+	public function test_the_languages_raw() {
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
-		$de = $this->factory->post->create();
+		$de = self::factory()->post->create();
 		self::$model->post->set_language( $de, 'de' );
 
 		self::$model->post->save_translations( $en, compact( 'fr' ) );
@@ -94,11 +96,11 @@ class Switcher_Test extends PLL_UnitTestCase {
 	/**
 	 *  Very basic tests for the switcher as list
 	 */
-	function test_list() {
-		$en = $this->factory->post->create();
+	public function test_list() {
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
 		self::$model->post->save_translations( $en, compact( 'fr' ) );
@@ -157,11 +159,11 @@ class Switcher_Test extends PLL_UnitTestCase {
 	/**
 	 * Very basic tests for the switcher as dropdown
 	 */
-	function test_dropdown() {
-		$en = $this->factory->post->create();
+	public function test_dropdown() {
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
 		self::$model->post->save_translations( $en, compact( 'fr' ) );
@@ -176,7 +178,7 @@ class Switcher_Test extends PLL_UnitTestCase {
 			'echo'     => 0,
 		);
 		$switcher = $this->switcher->the_languages( $this->frontend->links, $args );
-		$switcher = mb_convert_encoding( $switcher, 'HTML-ENTITIES', 'UTF-8' ); // Due to "Français"
+		$switcher = htmlspecialchars_decode( htmlentities( $switcher ) ); // Due to "Français".
 		$doc = new DomDocument();
 		$doc->loadHTML( $switcher );
 		$xpath = new DOMXpath( $doc );
@@ -185,5 +187,40 @@ class Switcher_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'selected', $option->item( 0 )->getAttribute( 'selected' ) );
 		$this->assertNotEmpty( $xpath->query( '//select/option[.="Français"]' )->length );
 		$this->assertNotEmpty( $xpath->query( '//script' )->length );
+		$lang_attributes = $xpath->query( '//select/option/@lang' );
+		$this->assertEquals( 'en-US', $lang_attributes->item( 0 )->value );
+		$this->assertEquals( 'fr-FR', $lang_attributes->item( 1 )->value );
+	}
+
+	public function test_with_hide_if_no_translation_option_in_admin_context() {
+		$links_model = self::$model->get_links_model();
+		$this->pll_admin = new PLL_Admin( $links_model );
+		$this->pll_admin->init();
+
+		$en = self::factory()->post->create();
+		self::$model->post->set_language( $en, 'en' );
+
+		$fr = self::factory()->post->create();
+		self::$model->post->set_language( $fr, 'fr' );
+
+		self::$model->clean_languages_cache(); // FIXME for some reason, I need to clear the cache to get an exact count
+
+		$args = array(
+			'hide_if_no_translation' => 1,
+			'echo'                   => 0,
+		);
+		$switcher = $this->switcher->the_languages( $this->pll_admin->links, $args );
+
+		$this->assertNotEmpty( $switcher );
+
+		$doc = new DomDocument();
+		$doc->loadHTML( $switcher );
+		$xpath = new DOMXpath( $doc );
+
+		$a = $xpath->query( '//li/a[@lang="en-US"]' );
+		$this->assertEquals( $this->pll_admin->links->get_home_url( self::$model->get_language( 'en' ) ), $a->item( 0 )->getAttribute( 'href' ) );
+
+		$a = $xpath->query( '//li/a[@lang="fr-FR"]' );
+		$this->assertEquals( $this->pll_admin->links->get_home_url( self::$model->get_language( 'fr' ) ), $a->item( 0 )->getAttribute( 'href' ) );
 	}
 }

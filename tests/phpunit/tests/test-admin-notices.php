@@ -2,27 +2,30 @@
 
 class Admin_Notices_Test extends PLL_UnitTestCase {
 
-	static function wp_redirect() {
-		throw new Exception( 'Call to wp_redirect' );
-	}
-
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		$links_model = self::$model->get_links_model();
 		$this->pll_admin = new PLL_Admin( $links_model );
 	}
 
-	function test_hide_notice() {
-		// Allows to continue the execution after wp_redirect + exit.
-		add_filter( 'wp_redirect', array( __CLASS__, 'wp_redirect' ) );
-		if ( method_exists( $this, 'setExpectedException' ) ) {
-			// setExpectedException has been deprecated in recent versions of phpunit
-			$this->setExpectedException( 'Exception', 'Call to wp_redirect' );
-		} else {
-			$this->expectException( 'Exception' );
-			$this->expectExceptionMessage( 'Call to wp_redirect' );
-		}
+	/**
+	 * Allows to continue the execution after wp_redirect + exit.
+	 */
+	protected function expect_wp_redirect() {
+		add_filter(
+			'wp_redirect',
+			function () { // phpcs:ignore WordPressVIPMinimum.Hooks.AlwaysReturnInFilter.MissingReturnStatement
+				throw new Exception( 'Call to wp_redirect' );
+			}
+		);
+
+		$this->expectException( 'Exception' );
+		$this->expectExceptionMessage( 'Call to wp_redirect' );
+	}
+
+	public function test_hide_notice() {
+		$this->expect_wp_redirect();
 
 		wp_set_current_user( 1 );
 
@@ -37,7 +40,7 @@ class Admin_Notices_Test extends PLL_UnitTestCase {
 		$this->assertEquals( array( 'review' ), get_user_meta( 1, 'pll_dismissed_notices', true ) );
 	}
 
-	function test_no_review_notice_for_old_users() {
+	public function test_no_review_notice_for_old_users() {
 		wp_set_current_user( 1 );
 
 		$_GET['page'] = 'mlang';
@@ -53,7 +56,7 @@ class Admin_Notices_Test extends PLL_UnitTestCase {
 		$this->assertFalse( strpos( $out, 'review' ) );
 	}
 
-	function test_review_notice() {
+	public function test_review_notice() {
 		wp_set_current_user( 1 );
 
 		$_GET['page'] = 'mlang';
@@ -74,7 +77,7 @@ class Admin_Notices_Test extends PLL_UnitTestCase {
 		}
 	}
 
-	function test_hidden_review_notice() {
+	public function test_hidden_review_notice() {
 		wp_set_current_user( 1 );
 		update_user_meta( 1, 'pll_dismissed_notices', array( 'review' ) );
 
@@ -92,7 +95,7 @@ class Admin_Notices_Test extends PLL_UnitTestCase {
 		$this->assertFalse( strpos( $out, 'review' ) );
 	}
 
-	function test_no_review_notice_for_non_admin() {
+	public function test_no_review_notice_for_non_admin() {
 		$editor = self::factory()->user->create( array( 'role' => 'editor' ) );
 		wp_set_current_user( $editor );
 
@@ -110,7 +113,7 @@ class Admin_Notices_Test extends PLL_UnitTestCase {
 		$this->assertEmpty( $out );
 	}
 
-	function test_pllwc_notice() {
+	public function test_pllwc_notice() {
 		wp_set_current_user( 1 );
 
 		$_GET['page'] = 'mlang';
@@ -129,32 +132,7 @@ class Admin_Notices_Test extends PLL_UnitTestCase {
 		$this->assertNotFalse( strpos( $out, 'pllwc' ) );
 	}
 
-	function test_lingotek_notice() {
-		wp_set_current_user( 1 );
-
-		$_GET['page'] = 'mlang';
-		$GLOBALS['hook_suffix'] = 'plugins.php';
-		set_current_screen();
-
-		if ( class_exists( 'PLL_Lingotek' ) ) {
-			$l = new PLL_Lingotek();
-			$l->init();
-		}
-
-		$this->pll_admin->admin_notices = new PLL_Admin_Notices( $this->pll_admin );
-
-		ob_start();
-		do_action( 'admin_notices' );
-		$out = ob_get_clean();
-
-		if ( defined( 'POLYLANG_PRO' ) ) {
-			$this->assertFalse( strpos( $out, 'lingotek' ) );
-		} else {
-			$this->assertNotFalse( strpos( $out, 'lingotek' ) );
-		}
-	}
-
-	function test_legacy_user_meta() {
+	public function test_legacy_user_meta() {
 		wp_set_current_user( 1 );
 		update_user_meta( 1, 'pll_dismissed_notices', array( 'test_notice' ) );
 

@@ -1,29 +1,19 @@
 <?php
 
-class PLL_Canonical_UnitTestCase extends WP_Canonical_UnitTestCase {
+abstract class PLL_Canonical_UnitTestCase extends WP_Canonical_UnitTestCase {
 	use PLL_UnitTestCase_Trait;
 
-	/**
-	 * Set in [@see PLL_Canonical_UnitTestCase::assertCanonical()}.
-	 *
-	 * @var PLL_Frontend
-	 */
-	protected $pll_env = null;
+	protected static function register_post_types_and_taxonomies() {
+		create_initial_taxonomies();
+	}
 
-	/**
-	 * Default to {@see PLL_Install::get_default_options()}.
-	 *
-	 * @var array
-	 */
-	protected $options;
-
-	public function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		add_filter( 'wp_using_themes', '__return_true' ); // To pass the test in PLL_Choose_Lang::init() by default.
 		add_filter( 'wp_doing_ajax', '__return_false' );
 
-		$this->options = PLL_Install::get_default_options();
+		$this->options = get_option( 'polylang' );
 	}
 
 	/**
@@ -36,7 +26,7 @@ class PLL_Canonical_UnitTestCase extends WP_Canonical_UnitTestCase {
 
 		$wp_rewrite->init();
 		$wp_rewrite->extra_rules_top = array(); // brute force since WP does not do it :(
-		$wp_rewrite->set_permalink_structure( $this->structure );
+		$wp_rewrite->set_permalink_structure( $structure );
 
 		// $wp_rewrite->flush_rules() is called in self::assertCanonical()
 	}
@@ -60,10 +50,9 @@ class PLL_Canonical_UnitTestCase extends WP_Canonical_UnitTestCase {
 		$_SERVER['REQUEST_URI'] = $test_url;
 
 		$model = new PLL_Model( $this->options );
-
-		// register post types and taxonomies
 		$model->post->register_taxonomy(); // needs this for 'lang' query var
-		create_initial_taxonomies();
+
+		static::register_post_types_and_taxonomies();
 
 		// reset the links model according to the permalink structure
 		$links_model    = $model->get_links_model();
@@ -80,14 +69,14 @@ class PLL_Canonical_UnitTestCase extends WP_Canonical_UnitTestCase {
 	/**
 	 * Parses the canonical url if redirect, by either Polylang and/or WordPress.
 	 *
-	 * The {@see PLL_Frontend_Filters_Links::check_canonical_url()} method is hooked on {@see https://github.com/WordPress/wordpress-develop/blob/505fe2f0b87bba956d399f657f85a7073c978289/src/wp-includes/template-loader.php#L13 template_redirect}, which is not triggered during automated tests.
+	 * The {@see PLL_Canonical::check_canonical_url()} method is hooked on {@see https://github.com/WordPress/wordpress-develop/blob/505fe2f0b87bba956d399f657f85a7073c978289/src/wp-includes/template-loader.php#L13 template_redirect}, which is not triggered during automated tests.
 	 *
 	 * @param string $test_url
 	 *
 	 * @return string Either the canonical url, if redirected, or the inputted $test_url.
 	 */
 	public function get_canonical( $test_url ) {
-		$pll_redirected_url = $this->pll_env->filters_links->check_canonical_url( home_url( $test_url ), false );
+		$pll_redirected_url = $this->pll_env->canonical->check_canonical_url( home_url( $test_url ), false );
 
 		if ( $pll_redirected_url && $pll_redirected_url !== $test_url ) {
 			return $pll_redirected_url;

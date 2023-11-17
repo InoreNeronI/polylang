@@ -2,11 +2,28 @@
 		<custom-fields>
 				<custom-field action="copy">quantity</custom-field>
 				<custom-field action="translate">custom-title</custom-field>
+				<custom-field action="translate">custom|nested</custom-field>
 				<custom-field action="copy">weight</custom-field>
 				<custom-field action="copy-once">bg-color</custom-field>
 				<custom-field action="translate">custom-description</custom-field>
 				<custom-field action="ignore">date-added</custom-field>
 		</custom-fields>
+		<custom-fields-texts>
+			<key name="custom|nested">
+				<key name="sub-1" />
+				<key name="sub-2">
+					<key name="sub|21">
+						<key name="sub-211" />
+						<key name=" " />
+						<key name="" />
+						<key />
+					</key>
+				</key>
+			</key>
+			<key name="custom-nested-2">
+				<key name="sub-1" />
+			</key>
+		</custom-fields-texts>
 		<custom-term-fields>
 			<custom-term-field action="copy">term_meta_A</custom-term-field>
 			<custom-term-field action="translate">term_meta_B</custom-term-field>
@@ -45,12 +62,40 @@
 				</key>
 				<key name="empty_option">
 					<key name="*">
-		            	<key name="label"/>
+						<key name="label"/>
 					</key>
 				</key>
 				<key name="simple_string_option" />
 				<key name="generic_option_*" />
 		</admin-texts>
+		<gutenberg-blocks>
+			<gutenberg-block type="my-plugin/my-block" translate="1">
+				<xpath>//figure/figcaption</xpath>
+				<xpath>//figure/img/@alt</xpath>
+				<key name="headingTitle" />
+				<key name="text" />
+			</gutenberg-block>
+			<gutenberg-block type="my-plugin/my-block-2" translate="1">
+				<xpath>//div/p/a</xpath>
+				<key name="iconLabel" />
+			</gutenberg-block>
+			<gutenberg-block type=" " translate="1">
+				<xpath>//div/p/a</xpath>
+				<key name="iconLabel" />
+			</gutenberg-block>
+			<gutenberg-block type="my-plugin/my-block-4">
+				<xpath>//div/p/a</xpath>
+				<key name="iconLabel" />
+			</gutenberg-block>
+			<gutenberg-block type="my-plugin/my-block-5" translate="1">
+				<xpath> </xpath>
+				<key name="iconLabel" />
+			</gutenberg-block>
+			<gutenberg-block type="my-plugin/my-block-6" translate="1">
+				<xpath>//div/p/a</xpath>
+				<key name=" " />
+			</gutenberg-block>
+		</gutenberg-blocks>
 		<language-switcher-settings>
 				<key name="icl_lang_sel_config">
 						<key name="font-current-normal">#444444</key>

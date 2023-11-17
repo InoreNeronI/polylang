@@ -2,7 +2,7 @@
 
 class Install_Test extends PLL_UnitTestCase {
 
-	function test_activate() {
+	public function test_activate() {
 		delete_option( 'polylang' );
 		do_action( 'activate_' . POLYLANG_BASENAME );
 
@@ -20,14 +20,14 @@ class Install_Test extends PLL_UnitTestCase {
 	 * The constant PLL_REMOVE_ALL_DATA must not be defined.
 	 * This test must be executed before all uninstall tests.
 	 */
-	function test_uninstall_without_removing_data() {
+	public function test_uninstall_without_removing_data() {
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', true );
 		}
 
 		do_action( 'activate_' . POLYLANG_BASENAME );
 
-		include_once dirname( dirname( dirname( dirname( __FILE__ ) ) ) ) . '/uninstall.php';
+		include_once dirname( __DIR__, 3 ) . '/uninstall.php';
 		new PLL_Uninstall();
 
 		// Constant PLL_REMOVE_ALL_DATA undefined => nothing deleted
@@ -38,7 +38,7 @@ class Install_Test extends PLL_UnitTestCase {
 	/**
 	 * This test requires the definition of the constants WP_UNINSTALL_PLUGIN and PLL_REMOVE_ALL_DATA
 	 */
-	function test_uninstall_removing_data() {
+	public function test_uninstall_removing_data() {
 		global $wpdb;
 
 		do_action( 'activate_' . POLYLANG_BASENAME );
@@ -47,23 +47,24 @@ class Install_Test extends PLL_UnitTestCase {
 		$english = self::$model->get_language( 'en' );
 
 		self::create_language( 'fr_FR' );
+		$french = self::$model->get_language( 'fr' );
 
 		// Posts and terms
-		$en = $this->factory->post->create();
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
 		self::$model->post->save_translations( $en, compact( 'en', 'fr' ) );
 
-		$en = $this->factory->term->create( array( 'taxonomy' => 'category', 'name' => 'test' ) );
+		$en = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'test' ) );
 		self::$model->term->set_language( $en, 'en' );
 
-		$post_translations_groups = get_terms( 'post_translations' );
+		$post_translations_groups = get_terms( array( 'taxonomy' => 'post_translations' ) );
 		$post_group = reset( $post_translations_groups );
 
-		$term_translations_groups = get_terms( 'term_translations' );
+		$term_translations_groups = get_terms( array( 'taxonomy' => 'term_translations' ) );
 		$term_group = reset( $term_translations_groups );
 
 		// User metas
@@ -85,6 +86,11 @@ class Install_Test extends PLL_UnitTestCase {
 
 		update_post_meta( $item_id, '_pll_menu_item', array() );
 
+		// Strings translations
+		$_mo = new PLL_MO();
+		$_mo->add_entry( $_mo->make_entry( 'test', 'test fr' ) );
+		$_mo->export_to_db( self::$model->get_language( 'fr' ) );
+
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', true );
 		}
@@ -100,22 +106,19 @@ class Install_Test extends PLL_UnitTestCase {
 		$this->assertEmpty( get_option( 'polylang' ) );
 
 		// No languages
-		$this->assertEmpty( get_terms( 'language', array( 'hide_empty' => false ) ) );
-		$this->assertEmpty( get_terms( 'term_language' ) );
+		$this->assertEmpty( get_terms( array( 'taxonomy' => 'language', 'hide_empty' => false ) ) );
+		$this->assertEmpty( get_terms( array( 'taxonomy' => 'term_language' ) ) );
 
 		// No languages for posts and terms
-		$this->assertEmpty( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->term_relationships} WHERE term_taxonomy_id=%d", $english->term_taxonomy_id ) ) );
-		$this->assertEmpty( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->term_relationships} WHERE term_taxonomy_id=%d", $english->tl_term_taxonomy_id ) ) );
+		$this->assertEmpty( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->term_relationships} WHERE term_taxonomy_id=%d", $english->get_tax_prop( 'language', 'term_taxonomy_id' ) ) ) );
+		$this->assertEmpty( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->term_relationships} WHERE term_taxonomy_id=%d", $english->get_tax_prop( 'term_language', 'term_taxonomy_id' ) ) ) );
 
 		// No translations for posts and terms
-		$this->assertEmpty( get_terms( 'post_translations' ) );
-		$this->assertEmpty( get_terms( 'term_translations' ) );
+		$this->assertEmpty( get_terms( array( 'taxonomy' => 'post_translations' ) ) );
+		$this->assertEmpty( get_terms( array( 'taxonomy' => 'term_translations' ) ) );
 
 		$this->assertEmpty( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->term_relationships} WHERE term_taxonomy_id=%d", $post_group->term_taxonomy_id ) ) );
 		$this->assertEmpty( $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->term_relationships} WHERE term_taxonomy_id=%d", $term_group->term_taxonomy_id ) ) );
-
-		// No strings translations, bug fixed in 2.2.1
-		$this->assertEmpty( get_post( $english->mo_id ) );
 
 		// Users metas
 		$this->assertEmpty( $wpdb->get_results( "SELECT * FROM {$wpdb->usermeta} WHERE meta_key='pll_filter_content'" ) );
@@ -123,5 +126,8 @@ class Install_Test extends PLL_UnitTestCase {
 
 		// Language switcher menu items
 		$this->assertEmpty( get_post( $item_id ) );
+
+		// Strings translations
+		$this->assertEmpty( get_term_meta( $french->term_id ) );
 	}
 }

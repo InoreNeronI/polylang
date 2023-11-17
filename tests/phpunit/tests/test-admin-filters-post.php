@@ -1,7 +1,7 @@
 <?php
 
 class Admin_Filters_Post_Test extends PLL_UnitTestCase {
-	static $editor;
+	protected static $editor;
 
 	/**
 	 * @param WP_UnitTest_Factory $factory
@@ -11,6 +11,11 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 
 		self::$model->post->register_taxonomy();
 
+		$links_model     = self::$model->get_links_model();
+		$pll_admin = new PLL_Admin( $links_model );
+		$admin_default_term = new PLL_Admin_Default_Term( $pll_admin );
+		$admin_default_term->add_hooks();
+
 		self::create_language( 'en_US' );
 		self::create_language( 'fr_FR' );
 		self::create_language( 'de_DE_formal' );
@@ -19,8 +24,8 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		self::$editor = $factory->user->create( array( 'role' => 'editor' ) );
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		wp_set_current_user( self::$editor ); // Set a user to pass current_user_can tests
 
@@ -33,31 +38,31 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->pll_admin->posts = new PLL_CRUD_Posts( $this->pll_admin );
 	}
 
-	function test_default_language() {
+	public function test_default_language() {
 		// User preferred language
 		$this->pll_admin->pref_lang = self::$model->get_language( 'fr' );
-		$post_id = $this->factory->post->create();
+		$post_id = self::factory()->post->create();
 		$this->assertEquals( 'fr', self::$model->post->get_language( $post_id )->slug );
 
 		// Language set from parent
-		$parent = $this->factory->post->create();
+		$parent = self::factory()->post->create();
 		self::$model->post->set_language( $parent, 'de' );
-		$post_id = $this->factory->post->create( array( 'post_parent' => $parent ) );
+		$post_id = self::factory()->post->create( array( 'post_parent' => $parent ) );
 		$this->assertEquals( 'de', self::$model->post->get_language( $post_id )->slug );
 
 		// Language set when adding a new translation
 		$_GET['new_lang'] = 'es';
-		$post_id = $this->factory->post->create();
+		$post_id = self::factory()->post->create();
 		$this->assertEquals( 'es', self::$model->post->get_language( $post_id )->slug );
 	}
 
-	function test_save_post_from_metabox() {
+	public function test_save_post_from_metabox() {
 		$GLOBALS['post_type'] = 'post';
 
 		$_REQUEST = $_POST = array(
 			'post_lang_choice' => 'en',
 			'_pll_nonce'       => wp_create_nonce( 'pll_language' ),
-			'post_ID'          => $en = $this->factory->post->create(),
+			'post_ID'          => $en = self::factory()->post->create(),
 		);
 		do_action( 'load-post.php' );
 		edit_post();
@@ -69,7 +74,7 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 			'post_lang_choice' => 'fr',
 			'_pll_nonce'       => wp_create_nonce( 'pll_language' ),
 			'post_tr_lang'     => array( 'en' => $en ),
-			'post_ID'          => $fr = $this->factory->post->create(),
+			'post_ID'          => $fr = self::factory()->post->create(),
 		);
 		do_action( 'load-post.php' );
 		edit_post();
@@ -78,8 +83,8 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEqualSets( compact( 'en', 'fr' ), self::$model->post->get_translations( $en ) );
 	}
 
-	function test_save_post_from_bulk_edit() {
-		$posts = $this->factory->post->create_many( 2 );
+	public function test_save_post_from_bulk_edit() {
+		$posts = self::factory()->post->create_many( 2 );
 		self::$model->post->set_language( $posts[0], 'en' );
 		self::$model->post->set_language( $posts[1], 'fr' );
 
@@ -93,49 +98,49 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		);
 
 		do_action( 'load-edit.php' );
-		$done = bulk_edit_posts( $_REQUEST );
+		bulk_edit_posts( $_REQUEST );
 		$this->assertEquals( 'en', self::$model->post->get_language( $posts[0] )->slug );
 		$this->assertEquals( 'fr', self::$model->post->get_language( $posts[1] )->slug );
 
 		// Second modify all languages
 		$_REQUEST['inline_lang_choice'] = $_GET['inline_lang_choice'] = 'fr';
 		do_action( 'load-edit.php' );
-		$done = bulk_edit_posts( $_REQUEST );
+		bulk_edit_posts( $_REQUEST );
 		$this->assertEquals( 'fr', self::$model->post->get_language( $posts[0] )->slug );
 		$this->assertEquals( 'fr', self::$model->post->get_language( $posts[1] )->slug );
 	}
 
-	function test_quickdraft() {
+	public function test_quickdraft() {
 		$_REQUEST = array(
 			'action'   => 'post-quickdraft-save',
 			'_wpnonce' => wp_create_nonce( 'add-post' ),
 		);
 
 		$this->pll_admin->pref_lang = self::$model->get_language( 'fr' );
-		$post_id = $this->factory->post->create();
+		$post_id = self::factory()->post->create();
 		$this->assertEquals( 'fr', self::$model->post->get_language( $post_id )->slug );
 	}
 
-	function test_save_post_with_categories() {
-		$en = $this->factory->category->create();
+	public function test_save_post_with_categories() {
+		$en = self::factory()->category->create();
 		self::$model->term->set_language( $en, 'en' );
 
-		$fr = $this->factory->category->create();
+		$fr = self::factory()->category->create();
 		self::$model->term->set_language( $fr, 'fr' );
 
 		self::$model->term->save_translations( $en, compact( 'en', 'fr' ) );
 
-		$en2 = $this->factory->category->create();
+		$en2 = self::factory()->category->create();
 		self::$model->term->set_language( $en2, 'en' );
 
-		$fr2 = $this->factory->category->create();
+		$fr2 = self::factory()->category->create();
 		self::$model->term->set_language( $fr2, 'fr' );
 
 		$_REQUEST = $_POST = array(
 			'post_lang_choice' => 'fr',
 			'_pll_nonce'       => wp_create_nonce( 'pll_language' ),
 			'post_category'    => array( $en, $en2, $fr2 ),
-			'post_ID'          => $post_id = $this->factory->post->create(),
+			'post_ID'          => $post_id = self::factory()->post->create(),
 		);
 		do_action( 'load-post.php' );
 		edit_post();
@@ -146,20 +151,20 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertTrue( is_object_in_term( $post_id, 'category', $fr2 ) );
 	}
 
-	function test_save_post_with_tags() {
+	public function test_save_post_with_tags() {
 		$this->pll_admin->filters_term = new PLL_Admin_Filters_Term( $this->pll_admin );
 
-		$en = $this->factory->tag->create( array( 'name' => 'test' ) );
+		$en = self::factory()->tag->create( array( 'name' => 'test' ) );
 		self::$model->term->set_language( $en, 'en' );
 
-		$fr = $this->factory->tag->create( array( 'name' => 'test', 'slug' => 'test-fr' ) );
+		$fr = self::factory()->tag->create( array( 'name' => 'test', 'slug' => 'test-fr' ) );
 		self::$model->term->set_language( $fr, 'fr' );
 
 		$_REQUEST = $_POST = array(
 			'post_lang_choice' => 'fr',
 			'_pll_nonce'       => wp_create_nonce( 'pll_language' ),
 			'tax_input'        => array( 'post_tag' => array( 'test', 'new' ) ),
-			'post_ID'          => $post_id = $this->factory->post->create(),
+			'post_ID'          => $post_id = self::factory()->post->create(),
 		);
 		do_action( 'load-post.php' );
 		edit_post();
@@ -172,14 +177,14 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'fr', self::$model->term->get_language( $new->term_id )->slug );
 	}
 
-	function test_delete_post() {
-		$en = $this->factory->post->create();
+	public function test_delete_post() {
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
-		$de = $this->factory->post->create();
+		$de = self::factory()->post->create();
 		self::$model->post->set_language( $de, 'de' );
 
 		self::$model->post->save_translations( $en, compact( 'en', 'fr', 'de' ) );
@@ -192,14 +197,14 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 2, $group->count ); // Count updated
 	}
 
-	function test_page_attributes_meta_box() {
-		$en = $this->factory->post->create( array( 'post_title' => 'test', 'post_type' => 'page' ) );
+	public function test_page_attributes_meta_box() {
+		$en = self::factory()->post->create( array( 'post_title' => 'test', 'post_type' => 'page' ) );
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create( array( 'post_title' => 'essai', 'post_type' => 'page' ) );
+		$fr = self::factory()->post->create( array( 'post_title' => 'essai', 'post_type' => 'page' ) );
 		self::$model->post->set_language( $fr, 'fr' );
 
-		$page = $this->factory->post->create_and_get( array( 'post_type' => 'page' ) );
+		$page = self::factory()->post->create_and_get( array( 'post_type' => 'page' ) );
 		self::$model->post->set_language( $page->ID, 'fr' );
 
 		$this->pll_admin->filters = new PLL_Admin_Filters( $this->pll_admin ); // We need the get_pages filter
@@ -223,13 +228,13 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertFalse( strpos( $out, 'essai' ) );
 	}
 
-	function test_languages_meta_box_for_new_post() {
+	public function test_languages_meta_box_for_new_post() {
 		global $post_ID;
 
 		$lang = $this->pll_admin->pref_lang = self::$model->get_language( 'en' );
 		$this->pll_admin->links = new PLL_Admin_Links( $this->pll_admin );
-		$post_ID = $this->factory->post->create();
-		wp_set_object_terms( $post_ID, null, 'language' ); // Intentionally remove the language
+		$post_ID = self::factory()->post->create();
+		wp_set_object_terms( $post_ID, array(), 'language' ); // Intentionally remove the language
 
 		ob_start();
 		$this->pll_admin->classic_editor->post_language();
@@ -242,14 +247,14 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'selected', $option->item( 0 )->getAttribute( 'selected' ) );
 	}
 
-	function test_languages_meta_box_for_new_translation() {
+	public function test_languages_meta_box_for_new_translation() {
 		global $post_ID;
 
 		$this->pll_admin->links = new PLL_Admin_Links( $this->pll_admin );
-		$post_ID = $this->factory->post->create();
-		wp_set_object_terms( $post_ID, null, 'language' ); // Intentionally remove the language
+		$post_ID = self::factory()->post->create();
+		wp_set_object_terms( $post_ID, array(), 'language' ); // Intentionally remove the language
 
-		$en = $this->factory->post->create( array( 'post_title' => 'test' ) );
+		$en = self::factory()->post->create( array( 'post_title' => 'test' ) );
 		self::$model->post->set_language( $en, 'en' );
 		$lang = self::$model->get_language( 'fr' );
 		$_GET['from_post'] = $en;
@@ -258,7 +263,7 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		ob_start();
 		$this->pll_admin->classic_editor->post_language();
 		$form = ob_get_clean();
-		$form = mb_convert_encoding( $form, 'HTML-ENTITIES', 'UTF-8' ); // Due to "Français"
+		$form = htmlspecialchars_decode( htmlentities( $form ) ); // Due to "Français".
 		$doc = new DomDocument();
 		$doc->loadHTML( $form );
 		$xpath = new DOMXpath( $doc );
@@ -273,15 +278,15 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'test', $input->item( 0 )->getAttribute( 'value' ) );
 	}
 
-	function test_languages_meta_box_for_existing_post_with_translations() {
+	public function test_languages_meta_box_for_existing_post_with_translations() {
 		global $post_ID;
 
 		$this->pll_admin->links = new PLL_Admin_Links( $this->pll_admin );
 
-		$en = $this->factory->post->create( array( 'post_title' => 'test' ) );
+		$en = self::factory()->post->create( array( 'post_title' => 'test' ) );
 		self::$model->post->set_language( $en, 'en' );
 
-		$post_ID = $fr = $this->factory->post->create( array( 'post_title' => 'essai' ) );
+		$post_ID = $fr = self::factory()->post->create( array( 'post_title' => 'essai' ) );
 		self::$model->post->set_language( $fr, 'fr' );
 
 		self::$model->post->save_translations( $en, compact( 'en', 'fr' ) );
@@ -291,7 +296,7 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		ob_start();
 		$this->pll_admin->classic_editor->post_language();
 		$form = ob_get_clean();
-		$form = mb_convert_encoding( $form, 'HTML-ENTITIES', 'UTF-8' ); // Due to "Français"
+		$form = htmlspecialchars_decode( htmlentities( $form ) ); // Due to "Français".
 		$doc = new DomDocument();
 		$doc->loadHTML( $form );
 		$xpath = new DOMXpath( $doc );
@@ -319,12 +324,12 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEquals( '', $input->item( 0 )->getAttribute( 'value' ) );
 	}
 
-	function test_languages_meta_box_for_media() {
+	public function test_languages_meta_box_for_media() {
 		global $post_ID;
 
 		$this->pll_admin->options['media_support'] = 1;
 
-		$en = $this->factory->attachment->create_object( 'image0.jpg' );
+		$en = self::factory()->attachment->create_object( 'image0.jpg' );
 		self::$model->post->set_language( $en, 'en' );
 
 		$post_ID = $this->pll_admin->posts->create_media_translation( $en, 'fr' );
@@ -334,7 +339,7 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		ob_start();
 		$this->pll_admin->classic_editor->post_language();
 		$form = ob_get_clean();
-		$form = mb_convert_encoding( $form, 'HTML-ENTITIES', 'UTF-8' ); // Due to "Français"
+		$form = htmlspecialchars_decode( htmlentities( $form ) ); // Due to "Français".
 		$doc = new DomDocument();
 		$doc->loadHTML( $form );
 		$xpath = new DOMXpath( $doc );
@@ -355,14 +360,14 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertNotFalse( strpos( $form, 'Add a translation in Deutsch' ) );
 	}
 
-	function test_get_posts_language_filter() {
-		$en = $this->factory->post->create();
+	public function test_get_posts_language_filter() {
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
-		$de = $this->factory->post->create();
+		$de = self::factory()->post->create();
 		self::$model->post->set_language( $de, 'de' );
 
 		$posts = get_posts( array( 'fields' => 'ids', 'lang' => 'fr' ) );
@@ -381,24 +386,24 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEqualSets( array( $en, $fr, $de ), $posts );
 	}
 
-	function test_get_posts_with_query_var() {
+	public function test_get_posts_with_query_var() {
 		$this->pll_admin->options['taxonomies'] = array(
 			'trtax' => 'trtax',
 		);
 
 		register_taxonomy( 'trtax', 'post' ); // Translated custom tax
 
-		$en = $this->factory->post->create();
+		$en = self::factory()->post->create();
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create();
+		$fr = self::factory()->post->create();
 		self::$model->post->set_language( $fr, 'fr' );
 
-		$tag = $this->factory->tag->create();
+		$tag = self::factory()->tag->create();
 		self::$model->term->set_language( $tag, 'fr' );
 		wp_set_post_terms( $fr, array( $tag ), 'post_tag' );
 
-		$tax = $this->factory->term->create( array( 'taxonomy' => 'trtax' ) );
+		$tax = self::factory()->term->create( array( 'taxonomy' => 'trtax' ) );
 		self::$model->term->set_language( $tax, 'fr' );
 		wp_set_post_terms( $fr, array( $tax ), 'trtax' );
 
@@ -416,11 +421,13 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$posts = get_posts( array( 'fields' => 'ids', 'tag__in' => array( $tag ) ) );
 		$this->assertEmpty( $posts );
 
-		$tax_query[] = array(
-			'taxonomy' => 'post_tag',
-			'field'    => 'term_id',
-			'terms'    => $tag,
-			'operator' => 'IN',
+		$tax_query = array(
+			array(
+				'taxonomy' => 'post_tag',
+				'field'    => 'term_id',
+				'terms'    => $tag,
+				'operator' => 'IN',
+			),
 		);
 
 		$posts = get_posts( array( 'fields' => 'ids', 'tax_query' => $tax_query ) );
@@ -432,34 +439,34 @@ class Admin_Filters_Post_Test extends PLL_UnitTestCase {
 		$this->assertEquals( $fr, reset( $posts ) );
 	}
 
-	function test_categories_script_data_in_footer() {
-		$hook_suffix = $GLOBALS['hook_suffix'] = 'edit.php';
+	public function test_categories_script_data_in_footer() {
+		$GLOBALS['hook_suffix'] = 'edit.php';
 		set_current_screen( 'edit' );
 		$GLOBALS['wp_scripts'] = new WP_Scripts();
 		wp_default_scripts( $GLOBALS['wp_scripts'] );
+
+		$term_id = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'test' ) );
+		self::$model->term->set_language( $term_id, 'fr' );
+
 		do_action( 'admin_enqueue_scripts' );
 
 		ob_start();
 		do_action( 'admin_print_footer_scripts' );
 		$footer = ob_get_clean();
 
-		// All categories we have i.e. default categories
-		foreach ( self::$model->get_languages_list() as $lang ) {
-			$terms[ $lang->slug ] = array( 'category' => array( self::$model->term->get( 1, $lang->slug ) ) );
-		}
-
-		$this->assertNotFalse( strpos( $footer, 'var pll_term_languages = ' . wp_json_encode( $terms ) ) );
+		$this->assertEquals( 1, preg_match( '/var pll_term_languages = {"fr":{"category":\[(\d+),\d+\]}/', $footer, $matches ) );
+		$this->assertEquals( $term_id, $matches[1] );
 	}
 
-	function test_parent_pages_script_data_in_footer() {
-		$en = $this->factory->post->create( array( 'post_type' => 'page' ) );
+	public function test_parent_pages_script_data_in_footer() {
+		$en = self::factory()->post->create( array( 'post_type' => 'page' ) );
 		self::$model->post->set_language( $en, 'en' );
 
-		$fr = $this->factory->post->create( array( 'post_type' => 'page' ) );
+		$fr = self::factory()->post->create( array( 'post_type' => 'page' ) );
 		self::$model->post->set_language( $fr, 'fr' );
 
-		$hook_suffix = $GLOBALS['hook_suffix'] = 'edit.php';
-		$_REQUEST['post_type'] = 'page';
+		$GLOBALS['hook_suffix'] = 'edit.php';
+		$_REQUEST['post_type']  = 'page';
 		set_current_screen();
 		$GLOBALS['wp_scripts'] = new WP_Scripts();
 		wp_default_scripts( $GLOBALS['wp_scripts'] );

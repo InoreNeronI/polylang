@@ -10,20 +10,24 @@ class Strings_Test extends PLL_UnitTestCase {
 
 		self::create_language( 'en_US' );
 		self::create_language( 'fr_FR' );
+		self::create_language( 'de_DE' );
 
 		require_once POLYLANG_DIR . '/include/api.php';
 	}
 
-	function setUp() {
-		parent::setUp();
+	public function set_up() {
+		parent::set_up();
 
 		$this->links_model = self::$model->get_links_model();
 	}
 
-	// copied from WP widgets tests
-	function clean_up_global_scope() {
-		global $wp_widget_factory, $wp_registered_sidebars, $wp_registered_widgets, $wp_registered_widget_controls, $wp_registered_widget_updates;
+	/**
+	 * Copied from WP widgets tests.
+	 */
+	public function clean_up_global_scope() {
+		global $_wp_sidebars_widgets, $wp_widget_factory, $wp_registered_sidebars, $wp_registered_widgets, $wp_registered_widget_controls, $wp_registered_widget_updates;
 
+		$_wp_sidebars_widgets = array();
 		$wp_registered_sidebars = array();
 		$wp_registered_widgets = array();
 		$wp_registered_widget_controls = array();
@@ -33,11 +37,31 @@ class Strings_Test extends PLL_UnitTestCase {
 		parent::clean_up_global_scope();
 	}
 
-	function _return_fr_FR() {
+	protected function add_widget_search() {
+		update_option(
+			'widget_search',
+			array(
+				2              => array( 'title' => '' ),
+				'_multiwidget' => 1,
+			)
+		);
+
+		update_option(
+			'sidebars_widgets',
+			array(
+				'wp_inactive_widgets' => array(),
+				'sidebar-1'           => array( 'search-2' ),
+			)
+		);
+	}
+
+	public function _return_fr_FR() {
 		return array( 'fr_FR' );
 	}
 
-	function test_base_strings() {
+	public function test_core_strings() {
+		update_option( 'blogdescription', 'Just another WordPress site' ); // Since WP 6.1, the option is empty by default.
+
 		$pll_admin = new PLL_Admin( $this->links_model );
 		$pll_admin->init();
 		$strings = PLL_Admin_Strings::get_strings();
@@ -45,9 +69,14 @@ class Strings_Test extends PLL_UnitTestCase {
 		$this->assertCount( 4, array_intersect( array( 'blogname', 'blogdescription', 'date_format', 'time_format' ), $names ) );
 	}
 
-	// FIXME: order of nest two tests matters due to static protected strings in PLL_Admin_Strings
-	function test_widget_title_filtered_by_language() {
+	/**
+	 * /!\ The order of nest two tests matters due to static protected strings in PLL_Admin_Strings.
+	 */
+	public function test_widget_title_filtered_by_language() {
 		global $wp_registered_widgets;
+
+		$this->add_widget_search();
+
 		wp_widgets_init();
 		$wp_widget_search = $wp_registered_widgets['search-2']['callback'][0];
 
@@ -63,10 +92,9 @@ class Strings_Test extends PLL_UnitTestCase {
 		);
 
 		$_POST['widget-search'][2] = array(
-			'title' => 'My Title',
+			'title'    => 'My Title',
+			'pll_lang' => 'en',
 		);
-
-		$_POST['search-2_lang_choice'] = 'en';
 
 		$wp_widget_search->update_callback();
 		$strings = PLL_Admin_Strings::get_strings();
@@ -74,8 +102,11 @@ class Strings_Test extends PLL_UnitTestCase {
 		$this->assertNotContains( 'My Title', $strings );
 	}
 
-	function test_widget_title_in_all_languages() {
+	public function test_widget_title_in_all_languages() {
 		global $wp_registered_widgets;
+
+		$this->add_widget_search();
+
 		wp_widgets_init();
 		$wp_widget_search = $wp_registered_widgets['search-2']['callback'][0];
 
@@ -102,11 +133,14 @@ class Strings_Test extends PLL_UnitTestCase {
 		$this->assertContains( 'My Title', $strings );
 	}
 
-	// Bug fixed in 2.1
-	// Test #63
-	function test_html_string() {
+	/**
+	 * Bug fixed in 2.1.
+	 * Issue #63.
+	 */
+	public function test_html_string() {
 		update_option( 'use_balanceTags', 1 ); // To break malformed html in versions < 2.1
 		$language = self::$model->get_language( 'fr' );
+
 		$_mo = new PLL_MO();
 		$_mo->add_entry( $_mo->make_entry( '<p>test</p>', '<p>test fr</p>' ) );
 		$_mo->add_entry( $_mo->make_entry( '<p>malformed<p>', '<p>malformed fr<p>' ) );
@@ -114,7 +148,6 @@ class Strings_Test extends PLL_UnitTestCase {
 
 		$mo = new PLL_MO();
 		$mo->import_from_db( $language );
-		$GLOBALS['l10n']['pll_string'] = &$mo;
 
 		$frontend = new PLL_Frontend( $this->links_model );
 		$frontend->curlang = $language;
@@ -124,10 +157,13 @@ class Strings_Test extends PLL_UnitTestCase {
 		$this->assertEquals( '<p>malformed fr<p>', pll__( '<p>malformed<p>' ) );
 	}
 
-	// Bug introduced in 2.1 and fixed in 2.1.1
-	// Test #94
-	function test_slashed_string() {
+	/**
+	 * Bug introduced in 2.1 and fixed in 2.1.1.
+	 * Issue #94.
+	 */
+	public function test_slashed_string() {
 		$language = self::$model->get_language( 'fr' );
+
 		$_mo = new PLL_MO();
 		$_mo->add_entry( $_mo->make_entry( '\slashed', '\slashed fr' ) );
 		$_mo->add_entry( $_mo->make_entry( '\\slashed', '\\slashed fr' ) );
@@ -136,7 +172,6 @@ class Strings_Test extends PLL_UnitTestCase {
 
 		$mo = new PLL_MO();
 		$mo->import_from_db( $language );
-		$GLOBALS['l10n']['pll_string'] = &$mo;
 
 		$frontend = new PLL_Frontend( $this->links_model );
 		$frontend->curlang = $language;
@@ -147,7 +182,51 @@ class Strings_Test extends PLL_UnitTestCase {
 		$this->assertEquals( '\\\slashed fr', pll__( '\\\slashed' ) );
 	}
 
-	function test_switch_to_locale() {
+	/**
+	 * Tests workaround of https://core.trac.wordpress.org/ticket/55941
+	 */
+	public function test_empty_string() {
+		$language = self::$model->get_language( 'fr' );
+
+		$_mo = new PLL_MO();
+		$_mo->add_entry( $_mo->make_entry( '0', '0' ) );
+		$_mo->export_to_db( $language );
+
+		$mo = new PLL_MO();
+		$mo->import_from_db( $language );
+
+		$frontend = new PLL_Frontend( $this->links_model );
+		$frontend->curlang = $language;
+		do_action( 'pll_language_defined' );
+
+		$this->assertEquals( '0', pll__( '0' ) );
+		$this->assertEquals( '', pll__( '' ) );
+	}
+
+	public function test_translate_string_with_empty_string() {
+		foreach ( array( 'de', 'fr' ) as $lang ) {
+			$language = self::$model->get_language( $lang );
+			$mo = new PLL_MO();
+			$mo->import_from_db( $language );
+			$mo->add_entry( $mo->make_entry( '0', "0 - {$lang}" ) );
+			$mo->export_to_db( $language );
+		}
+
+		$frontend = new PLL_Frontend( $this->links_model );
+		$GLOBALS['polylang'] = $frontend;
+		$frontend->curlang = self::$model->get_language( 'fr' );
+		do_action( 'pll_language_defined' );
+
+		// Current language.
+		$this->assertEquals( '0 - fr', pll_translate_string( '0', 'fr' ) );
+		$this->assertEquals( '', pll_translate_string( '', 'fr' ) );
+
+		// Secondary language.
+		$this->assertEquals( '0 - de', pll_translate_string( '0', 'de' ) );
+		$this->assertEquals( '', pll_translate_string( '', 'de' ) );
+	}
+
+	public function test_switch_to_locale() {
 		// Strings translations
 		$mo = new PLL_MO();
 		$mo->add_entry( $mo->make_entry( 'test', 'test en' ) );
@@ -176,5 +255,38 @@ class Strings_Test extends PLL_UnitTestCase {
 		$this->assertEquals( 'test en', pll__( 'test' ) );
 
 		$GLOBALS['wp_locale_switcher'] = $old_locale_switcher; // Reset the original global var
+	}
+
+	public function test_export_empty_string() {
+		$lang = self::$model->get_language( 'fr' );
+		$mo   = new PLL_MO();
+
+		$mo->add_entry( $mo->make_entry( 'test', 'test fr' ) );
+		$mo->add_entry( $mo->make_entry( '', 'empty string fr' ) );
+		$mo->add_entry( $mo->make_entry( 'test 2', 'test 2 fr' ) );
+		$mo->export_to_db( $lang );
+
+		$strings  = get_term_meta( $lang->term_id, '_pll_strings_translations', true );
+		$expected = array(
+			array( 'test', 'test fr' ),
+			array( 'test 2', 'test 2 fr' ),
+		);
+
+		$this->assertSame( $expected, $strings );
+	}
+
+	public function test_import_empty_string() {
+		$lang = self::$model->get_language( 'fr' );
+		$mo   = new PLL_MO();
+
+		$strings = array(
+			array( 'test', 'test fr' ),
+			array( '', 'empty string fr' ),
+			array( 'test 2', 'test 2 fr' ),
+		);
+		update_term_meta( $lang->term_id, '_pll_strings_translations', $strings );
+
+		$mo->import_from_db( $lang );
+		$this->assertSame( array( 'test', 'test 2' ), array_keys( $mo->entries ) );
 	}
 }
